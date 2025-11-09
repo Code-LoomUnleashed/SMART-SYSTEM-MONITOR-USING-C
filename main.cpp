@@ -1,13 +1,3 @@
-// Day 4: Professional ncurses TUI System Monitor (WSL Linux)
-// Features:
-// - Smooth, flicker-free screen with ncurses
-// - Top processes table with CPU% / MEM%
-// - Sorting toggle (CPU <-> MEM) [t]
-// - Kill process by PID [k]
-// - Alert banner for high-usage processes (red/yellow/green thresholds)
-// - Color/self-test banner [c]
-// - Graceful exit [q]
-
 #include <iostream>
 #include <fstream>
 #include <string>
@@ -161,7 +151,7 @@ static inline std::vector<ProcessInfo> collectProcesses(long memKB,
     return plist;
 }
 
-// Color thresholds
+
 static inline int colorCPU(float cpu) {
     if (cpu >= 70.f) return 3;     // red
     if (cpu >= 25.f) return 2;     // yellow
@@ -191,7 +181,7 @@ static inline float cpuUsagePercent(float &lastCPU, unsigned long long &lastTota
     return pct;
 }
 
-// Draw a simple banner and legend
+
 static inline void drawHeader(bool sortByCPU, int rows, int cols,
                               float cpuPct, float memPct, bool alert) {
     attron(A_BOLD);
@@ -201,14 +191,14 @@ static inline void drawHeader(bool sortByCPU, int rows, int cols,
     mvprintw(1, 0, "[q] quit  [t] toggle sort  [k] kill PID  [c] color/self-test");
     mvprintw(2, 0, "CPU: %5.1f%%   MEM: %5.1f%%", cpuPct, memPct);
 
-    // Alert banner if any process crosses thresholds
+    
     if (alert) {
         attron(COLOR_PAIR(3) | A_BOLD); // red
         mvprintw(2, 24, "  ALERT: High usage detected!  ");
         attroff(COLOR_PAIR(3) | A_BOLD);
     }
 
-    // Table header
+    
     attron(COLOR_PAIR(4) | A_BOLD); // cyan
     mvprintw(4, 0,  "PID");
     mvprintw(4, 8,  "NAME");
@@ -216,14 +206,14 @@ static inline void drawHeader(bool sortByCPU, int rows, int cols,
     mvprintw(4, 40, "MEM%%");
     attroff(COLOR_PAIR(4) | A_BOLD);
 
-    // Legend
+    
     mvprintw(rows-1, 0, "Legend: ");
     attron(COLOR_PAIR(1)); printw("Green=Normal "); attroff(COLOR_PAIR(1));
     attron(COLOR_PAIR(2)); printw("Yellow=Medium "); attroff(COLOR_PAIR(2));
     attron(COLOR_PAIR(3)); printw("Red=High"); attroff(COLOR_PAIR(3));
 }
 
-// Show a quick color/self-test banner
+
 static inline void colorSelfTest(int cols) {
     int row = 6;
     attron(A_BOLD); mvprintw(row, 0, "Color/Self-Test:"); attroff(A_BOLD);
@@ -237,12 +227,12 @@ static inline void colorSelfTest(int cols) {
 }
 
 int main() {
-    // ncurses init
+    
     initscr();
     cbreak();
     noecho();
     keypad(stdscr, TRUE);
-    nodelay(stdscr, TRUE);  // non-blocking getch
+    nodelay(stdscr, TRUE);  
     curs_set(0);
 
     if (has_colors()) {
@@ -256,7 +246,7 @@ int main() {
 
     bool sortByCPU = true;
     Snapshot snap{};
-    // warm up CPU deltas
+    
     snap.totalCPU_prev = readTotalCPU();
     usleep(300*1000);
 
@@ -267,14 +257,12 @@ int main() {
         int rows, cols; getmaxyx(stdscr, rows, cols);
         clear();
 
-        // Overall CPU/MEM
         float cpuPct = cpuUsagePercent(lastCpuPct, lastTotal);
         float memPct = memUsagePercent();
 
         unsigned long long totalNow=0;
         auto plist = collectProcesses(memKB, snap, totalNow);
 
-        // Sort
         if (sortByCPU) {
             std::sort(plist.begin(), plist.end(),
                 [](const ProcessInfo& a, const ProcessInfo& b){ return a.cpu > b.cpu; });
@@ -283,7 +271,6 @@ int main() {
                 [](const ProcessInfo& a, const ProcessInfo& b){ return a.mem > b.mem; });
         }
 
-        // High-usage alert?
         bool alert = false;
         for (const auto& p : plist) {
             if (p.cpu >= 70.f || p.mem >= 15.f) { alert = true; break; }
@@ -291,7 +278,6 @@ int main() {
 
         drawHeader(sortByCPU, rows, cols, cpuPct, memPct, alert);
 
-        // Render top N (fit to window)
         int startRow = 6;
         int maxRows = rows - startRow - 2;
         if (maxRows < 1) maxRows = 1;
@@ -301,7 +287,7 @@ int main() {
             int row = startRow + shown;
             mvprintw(row, 0,  "%-7d", p.pid);
 
-            // name column clipped
+            
             std::string name = p.name;
             if ((int)name.size() > 22) name = name.substr(0, 22);
             mvprintw(row, 8,  "%-22s", name.c_str());
@@ -319,7 +305,7 @@ int main() {
             shown++;
         }
 
-        // Input handling (non-blocking)
+        
         int ch = getch();
         if (ch != ERR) {
             if (ch=='q' || ch=='Q') {
@@ -330,7 +316,7 @@ int main() {
                 sortByCPU = !sortByCPU;
             }
             if (ch=='k' || ch=='K') {
-                // prompt line
+                
                 echo();
                 nodelay(stdscr, FALSE);
                 curs_set(1);
@@ -364,8 +350,7 @@ int main() {
             }
         }
 
-        // ~2s cadence, feels smooth
-        // Use shorter sleep + loop to keep UI responsive to keys
+        
         // Here we do a single nap; ncurses keeps it smooth without flicker.
         usleep(1800 * 1000);
         refresh();
